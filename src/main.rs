@@ -3,43 +3,28 @@
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate serde_derive;
 extern crate rocket_contrib;
+extern crate percent_encoding;
+extern crate serde;
+extern crate base64;
+extern crate reqwest;
 
 #[cfg(test)] mod tests;
 
-use rocket::Request;
 use rocket_contrib::templates::{Template};
+use rocket_contrib::serve::StaticFiles;
 
-#[derive(Serialize)]
-struct TemplateContext {
-    title: &'static str,
-    // This key tells handlebars which template is the parent.
-    parent: &'static str,
-}
-
-#[get("/")]
-fn index() -> Template {
-    Template::render("index", &TemplateContext {
-        title: "index",
-        parent: "layout"
-    })
-}
-
-#[get("/oauth-login")]
-fn oauth_login() -> &'static str {
-    "OAUTH_LOGIN"
-}
-
-#[catch(404)]
-fn not_found(req: &Request) -> Template {
-    let mut map = std::collections::HashMap::new();
-    map.insert("path", req.uri().path());
-    Template::render("error/404", &map)
-}
+mod helpers;
+mod routes;
+mod eve_api;
 
 fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/", routes![index, oauth_login])
-        .register(catchers![not_found])
-        .attach(Template::fairing())
+    rocket::ignite()
+        .mount("/", routes![routes::index, routes::oauth_login])
+        .mount("/assets", StaticFiles::from("assets"))
+        .register(catchers![routes::not_found])
+        .attach(Template::custom(|engines| {
+            engines.handlebars.register_helper("url_encode", Box::new(helpers::url_encode));
+        }))
 }
 
 fn main() {
