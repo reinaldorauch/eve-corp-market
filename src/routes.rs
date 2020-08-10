@@ -38,7 +38,7 @@ enum AuthError {
     Expired
 }
 
-impl <'a, 'r> FromRequest for User {
+impl <'a, 'r> FromRequest<'a, 'r> for User {
     type Error = AuthError;
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
@@ -61,10 +61,11 @@ fn token_valid(t: &str) -> bool {
 }
 
 fn get_user_from_token(t: &str) -> User {
+    let at: String = String::from("cool");
     User {
         user_id: 1,
         token: {
-            access_token: String::from("BLA"),
+            access_token: at,
             token_type: String::from("Beaerer"),
             expire_in: 100,
             refresh_token: String::from("HOW")
