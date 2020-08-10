@@ -1,0 +1,7 @@
+[global]
+template_dir = "templates"
+assets_dir = "assets"
+
+[development]
+address = "localhost"
+port = 8000
