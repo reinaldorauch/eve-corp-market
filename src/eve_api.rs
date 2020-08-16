@@ -61,7 +61,7 @@ struct TokenError {
     error_description: String
 }
 
-pub fn do_login(creds: &EveOauthCreds, code: String) -> Result <TokenData, String> {
+pub fn do_login(creds: &EveOauthCreds, code: String) -> Result<serde_json::Value, String> {
     let mut data = HashMap::new();
     data.insert("grant_type", "authorization_code");
     data.insert("code", code.as_str());
@@ -75,13 +75,13 @@ pub fn do_login(creds: &EveOauthCreds, code: String) -> Result <TokenData, Strin
     let request_result = reqwest::blocking::Client::new()
         .post("https://login.eveonline.com/oauth/token")
         .headers(headers)
-        .json(& data)
+        .form(& data)
         .send();
 
         match request_result {
             Ok(response) => {
                 if response.status().is_success() {
-                    match response.json::<TokenData>() {
+                    match response.json() {
                         Ok(t) => Ok(t),
                         Err(e) => Err(format!("Decode error: {:?}", e))
                     }
@@ -121,6 +121,6 @@ pub fn get_key_sets() {
     println!("KEYS: {:?}", keys);
 }
 
-pub fn get_user_data(t: TokenData) -> TokenData {
+pub fn get_user_data<T>(t: T) -> T {
     t
 }

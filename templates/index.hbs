@@ -1,11 +1,3 @@
 {{>header}}
-{{#if user}}
-<pre>{{json user}}</pre>
-{{else}}
-<p>
-    <a href="https://login.eveonline.com/oauth/authorize?response_type=code&redirect_uri={{url_encode redirect_uri }}&client_id={{url_encode client_id }}&scope=publicData&state=omg">
-        <img src="assets/eve_sso.webp" alt="Login with Eve">
-    </a>
-</p>
-{{/if}}
+<h1>FACK</h1>
 {{>footer}}
