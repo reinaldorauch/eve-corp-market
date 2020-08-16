@@ -1,6 +1,8 @@
 [global]
 template_dir = "templates"
 assets_dir = "assets"
+eve_client_id = "CLIENT ID GOES HERE"
+eve_secret_key = "SECRET KEY GOES HERE"
 
 [development]
 address = "localhost"

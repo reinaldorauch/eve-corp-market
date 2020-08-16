@@ -18,3 +18,18 @@ pub fn url_encode(
 
     Ok(())
 }
+
+pub fn json(
+    h: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut Output
+) -> HelperResult {
+    if let Some(param) = h.param(0) {
+        let param_val = &param.value().to_string();
+        out.write(&param_val)?;
+    }
+
+    Ok(())
+}

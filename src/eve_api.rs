@@ -1,15 +1,46 @@
 use std::collections::HashMap;
-use reqwest::header::{HeaderMap, AUTHORIZATION};
+use reqwest::{
+    StatusCode,
+    header::{
+        HeaderMap, AUTHORIZATION, HeaderValue
+    }
+};
+use serde_derive::{Serialize, Deserialize};
+use jsonwebtoken::{decode, DecodingKey};
 
-pub const EVE_CLIENT_ID: & 'static str = "89a236612a8c4e21a25134e324c84667";
-pub const EVE_SECRET_KEY: & 'static str = "BfN8hzrLlwJ2RklbHHJ9KWPvQyioHVfIBIkmTW2e";
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EveOauthCreds {
+    pub client_id: String,
+    pub secret_key: String,
+}
+
+impl  ToString for EveOauthCreds {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.client_id, self.secret_key)
+    }
+}
+
+
+impl EveOauthCreds {
+    fn to_auth_basic(&self) -> String {
+        format!(
+            "Basic {}",
+            base64::encode(self.to_string().as_bytes())
+        )
+    }
+}
+
+#[derive(Debug)]
+enum EveOauthCredsError {
+    Missing,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenData {
-    access_token: String,
-    token_type: String,
-    expires_in: u16,
-    refresh_token: String
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: u16,
+    pub refresh_token: String
 }
 
 #[derive(Serialize)]
@@ -30,8 +61,7 @@ struct TokenError {
     error_description: String
 }
 
-
-pub fn do_login(code: String) -> Result <TokenData, String> {
+pub fn do_login(creds: &EveOauthCreds, code: String) -> Result <TokenData, String> {
     let mut data = HashMap::new();
     data.insert("grant_type", "authorization_code");
     data.insert("code", code.as_str());
@@ -39,16 +69,7 @@ pub fn do_login(code: String) -> Result <TokenData, String> {
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        format!(
-            "Basic {}",
-            base64::encode(
-                format!(
-                    "{}:{}",
-                    EVE_CLIENT_ID,
-                    EVE_SECRET_KEY
-                ).as_bytes()
-            )
-        ).as_str().parse().unwrap()
+        HeaderValue::from_str(creds.to_auth_basic().as_str()).unwrap()
     );
 
     let request_result = reqwest::blocking::Client::new()
@@ -59,19 +80,47 @@ pub fn do_login(code: String) -> Result <TokenData, String> {
 
         match request_result {
             Ok(response) => {
-            if response.status().is_success() {
-                match response.json::<TokenData>() {
-                    Ok(t) => Ok(t),
-                    Err(e) => Err(format!("Decode error: {:?}", e))
+                if response.status().is_success() {
+                    match response.json::<TokenData>() {
+                        Ok(t) => Ok(t),
+                        Err(e) => Err(format!("Decode error: {:?}", e))
+                    }
+                } else {
+                    match response.status() {
+                        StatusCode::UNAUTHORIZED => Err(String::from("Erro na autenticação do sistema")),
+                        _ => match response.json::<TokenError>() {
+                            Ok(err) => Err(format!("{}: {}", err.error, err.error_description)),
+                            Err(e) => Err(e.to_string())
+                        }
+                    }
                 }
-            } else {
-                match response.json::<TokenError>() {
-                    Ok(err) => Err(format!("{}: {}", err.error, err.error_description)),
-                    Err(e) => Err(e.to_string())
-                }
+            },
+            Err(error) => {
+                Err(error.to_string())
             }
-        }
-            ,
-        Err(error) => Err(error.to_string())
     }
+}
+
+pub fn validate_token(t: TokenData) -> bool {
+    // let key = &DecodingKey::from_rsa_pem(key: &'a [u8]);
+    // let val = decode(t.access_token);
+    // val.
+    // match (t.access_token) {
+    //     Ok(td) => println("TOKEN DATA: {:?}", td); true,
+    //     Err(_) => false
+    // }
+    true
+}
+
+pub fn get_key_sets() {
+    let jwk_set_url: &'static str = "https://login.eveonline.com/oauth/jwks";
+    let keys: serde_json::Value = reqwest::blocking::get(jwk_set_url)
+        .unwrap()
+        .json()
+        .unwrap();
+    println!("KEYS: {:?}", keys);
+}
+
+pub fn get_user_data(t: TokenData) -> TokenData {
+    t
 }

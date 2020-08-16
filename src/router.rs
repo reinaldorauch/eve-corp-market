@@ -1,23 +1,28 @@
-use rocket_contrib::templates::{Template, };
+use serde_derive::Serialize;
 use rocket::{
     Request,
-    response::Redirect,
+    State,
     request::{
         FromRequest,
         Outcome
+
     },
+    get,
+    catch,
     http::Status,
 };
+use rocket_contrib::templates::Template;
 
-use eve_api;
+use super::eve_api::EveOauthCreds;
 
 #[derive(Serialize)]
 struct TemplateContext {
-    title: &'static str,
-    redirect_uri: &'static str,
-    client_id: &'static str,
+    title: String,
+    redirect_uri: String,
+    client_id: String,
+    user: Option<User>,
     // This key tells handlebars which template is the parent.
-    parent: &'static str,
+    parent: String,
 }
 
 #[derive(Serialize)]
@@ -27,13 +32,13 @@ struct SellOrder {}
 struct BuyOrder {}
 
 #[derive(Serialize)]
-struct User {
+pub struct User {
     user_id: u32,
-    token: eve_api::TokenData,
+    token: super::eve_api::TokenData,
 }
 
 #[derive(Debug)]
-enum AuthError {
+pub enum AuthError {
     NotLogged,
     Expired
 }
@@ -51,7 +56,7 @@ impl <'a, 'r> FromRequest<'a, 'r> for User {
             1 if token_valid(keys[0]) => {
                 Outcome::Success(get_user_from_token(keys[0]))
             },
-            1 => Outcome::Failure((Status::BadRequest, AuthError::Expired))
+            _ => Outcome::Failure((Status::BadRequest, AuthError::Expired)),
         }
     }
 }
@@ -61,13 +66,12 @@ fn token_valid(t: &str) -> bool {
 }
 
 fn get_user_from_token(t: &str) -> User {
-    let at: String = String::from("cool");
     User {
         user_id: 1,
-        token: {
-            access_token: at,
+        token: super::eve_api::TokenData {
+            access_token: String::from("FOOOOo"),
             token_type: String::from("Beaerer"),
-            expire_in: 100,
+            expires_in: 100,
             refresh_token: String::from("HOW")
         }
     }
@@ -80,20 +84,27 @@ struct MarketContext {
 }
 
 #[get("/")]
-pub fn index() -> Template {
+pub fn index<'a>(user: Option<User>, creds: State<'a, EveOauthCreds>) -> Template {
     Template::render("index", &TemplateContext {
-        title: "index",
-        redirect_uri: "http://localhost:8000/oauth-login",
-        client_id: eve_api::EVE_CLIENT_ID,
-        parent: "layout"
+        title: String::from("index"),
+        redirect_uri: String::from("http://localhost:8000/oauth-login"),
+        client_id: (*creds.client_id).to_string(),
+        user: user,
+        parent: String::from("layout")
     })
 }
 
 #[get("/oauth-login?<code>")]
-pub fn oauth_login(code: String) -> Redirect {
-    let res = eve_api::do_login(code);
-    println!("{:?}", res);
-    Redirect::to("/market")
+pub fn oauth_login<'a>(creds: State<'a, EveOauthCreds>, code: String) -> Result<Template, String> {
+    let res = super::eve_api::do_login(creds.inner(), code);
+    super::eve_api::get_key_sets();
+    match res {
+        Ok(t) => {
+            let d = super::eve_api::get_user_data(t);
+            Ok(Template::render("user", d))
+        },
+        Err(e) => Err(format!("LOGIN Failed: {:?}", e))
+    }
 }
 
 #[get("/market")]
